@@ -1,0 +1,192 @@
+# 1) DATABASE SETTINGS
+database:
+  type: SQLITE    # options: MYSQL | SQLITE | MONGO
+
+  mysql:
+    host:     localhost
+    port:     3306
+    database: punishments
+    username: root
+    password: password
+
+  sqlite:
+    file: plugins/PunishmentSystem/data.db
+
+  mongo:
+    uri:      mongodb://localhost:27017
+    database: punishments
+cache-update-minutes: 5
+
+# 2) MESSAGES
+messages:
+
+  # Ban messages (different for each type)
+  join-banned: |
+    <red>⛔ <dark_red><bold>PERMANENT BAN</bold></dark_red>
+
+    <yellow>Reason:</yellow> <white>%reason%
+
+    <gray>This ban is permanent and will not expire.
+
+    <gray>Appeal at: <white>yourwebsite.com/appeal
+
+  join-tempban: |
+    <red>⛔ <dark_red><bold>TEMPORARY BAN</bold></dark_red>
+
+    <yellow>Duration:</yellow> <white>%duration%
+    <yellow>Expires:</yellow> <white>%expire%
+    <yellow>Reason:</yellow> <white>%reason%
+
+    <gray>You may join again after the ban expires.
+    <gray>Appeal at: <white>yourwebsite.com/appeal
+
+  join-ipban: |
+    <red>⛔ <dark_red><bold>IP BAN</bold></dark_red>
+
+    <yellow>Reason:</yellow> <white>%reason%
+
+    <gray>This ban affects all accounts from your IP address.
+    <gray>Appeal at: <white>yourwebsite.com/appeal
+
+  # Error messages
+  data-loading-error: "<red>An error occurred while loading your data. Please try again later."
+
+  # Conflict error messages
+  already-banned: "<red>Player already has an active ban or IP ban!"
+  already-muted: "<red>Player already has an active mute!"
+  already-ipbanned: "<red>Player already has an active IP ban!"
+
+  # New validation messages
+  not-banned: "<red>%player% is not banned!"
+  not-muted: "<red>%player% is not muted!"
+
+  # Mute messages (different for each type)
+  chat-muted:      "<yellow>You are permanently muted! Reason: %reason%"
+  chat-tempmute:   "<yellow>You are temporarily muted for %duration%. Reason: %reason%"
+
+  # Kick message screen
+  player-get-kicked: "<red>You have been kicked from the server! Reason: %reason%"
+
+  # Success messages for staff
+  ban-success:     "<green>%player% has been permanently banned. Reason: %reason%"
+  tempban-success: "<green>%player% banned for %duration%. Reason: %reason%"
+  unban-success:   "<green>%player% has been unbanned."
+
+  mute-success:    "<green>%player% has been permanently muted. Reason: %reason%"
+  tempmute-success: "<green>%player% muted for %duration%. Reason: %reason%"
+  unmute-success:  "<green>%player% has been unmuted."
+
+  ipban-success:   "<green>%player% has been IP‑banned. Reason: %reason%"
+  kick-success:    "<green>%player% has been kicked. Reason: %reason%"
+
+# 3) ENHANCED HISTORY MENU
+menu:
+  title:   "<red>Punishment History: <white>%player%"
+  size:    54
+
+  filler:
+    material: GRAY_STAINED_GLASS_PANE
+    name:     " "
+
+  items:
+    BAN:
+      material: RED_WOOL
+      name:     "<red><bold>PERMANENT BAN</bold> - %reason%"
+      lore:
+        - "<white>Issued: <yellow>%date%"
+        - "<white>By: <yellow>%actor%"
+        - "<white>Status: %status%"
+        - "<white>Reason: <gray>%reason%"
+        - ""
+        - "<white>Deactivation: <gray>%deactivation_reason%"
+        - "<white>Deactivated: <gray>%deactivation_date%"
+        # Additional placeholders available:
+        # %id% - Punishment ID
+        # %uuid% - Player UUID
+        # %player% - Player name
+        # %ip% - IP address (for IP bans)
+        # %duration% - Total duration
+        # %remaining% - Time remaining
+        # %deactivation_source% - Who removed the punishment
+
+    TEMP_BAN:
+      material: ORANGE_WOOL
+      name:     "<red><bold>TEMP BAN</bold> - %reason%"
+      lore:
+        - "<white>Issued: <yellow>%date%"
+        - "<white>By: <yellow>%actor%"
+        - "<white>Expires: <yellow>%expires%"
+        - "<white>Status: %status%"
+        - "<white>Duration: <yellow>%duration%"
+        - "<white>Remaining: <yellow>%remaining%"
+        - ""
+        - "<white>Reason: <gray>%reason%"
+        - ""
+        - "<white>Deactivation: <gray>%deactivation_reason%"
+        - "<white>Deactivated: <gray>%deactivation_date%"
+
+    MUTE:
+      material: YELLOW_WOOL
+      name:     "<yellow><bold>PERMANENT MUTE</bold> - %reason%"
+      lore:
+        - "<white>Issued: <yellow>%date%"
+        - "<white>By: <yellow>%actor%"
+        - "<white>Status: %status%"
+        - "<white>Reason: <gray>%reason%"
+        - ""
+        - "<white>Deactivation: <gray>%deactivation_reason%"
+        - "<white>Deactivated: <gray>%deactivation_date%"
+
+    TEMP_MUTE:
+      material: GREEN_WOOL
+      name:     "<yellow><bold>TEMP MUTE</bold> - %reason%"
+      lore:
+        - "<white>Issued: <yellow>%date%"
+        - "<white>By: <yellow>%actor%"
+        - "<white>Expires: <yellow>%expires%"
+        - "<white>Status: %status%"
+        - "<white>Duration: <yellow>%duration%"
+        - "<white>Remaining: <yellow>%remaining%"
+        - ""
+        - "<white>Reason: <gray>%reason%"
+        - ""
+        - "<white>Deactivation: <gray>%deactivation_reason%"
+        - "<white>Deactivated: <gray>%deactivation_date%"
+
+    IP_BAN:
+      material: BLACK_WOOL
+      name:     "<red><bold>IP BAN</bold> - %reason%"
+      lore:
+        - "<white>Issued: <yellow>%date%"
+        - "<white>By: <yellow>%actor%"
+        - "<white>IP: <yellow>%ip%"
+        - "<white>Status: %status%"
+        - "<white>Reason: <gray>%reason%"
+        - ""
+        - "<white>Deactivation: <gray>%deactivation_reason%"
+        - "<white>Deactivated: <gray>%deactivation_date%"
+
+    KICK:
+      material: MAGENTA_WOOL
+      name:     "<light_purple><bold>KICK</bold> - %reason%"
+      lore:
+        - "<white>Issued: <yellow>%date%"
+        - "<white>By: <yellow>%actor%"
+        - "<white>Status: <red>COMPLETED"
+        - "<white>Reason: <gray>%reason%"
+
+# Available placeholders for menu items:
+# %reason% - Punishment reason
+# %date% - Date when punishment was issued (formatted)
+# %expires% - Expiration date (formatted, "Never" for permanent)
+# %actor% - Who issued the punishment
+# %status% - Whether punishment is currently ACTIVE or INACTIVE
+# %id% - Punishment database ID
+# %uuid% - Player's UUID
+# %player% - Player's name
+# %ip% - IP address (for IP bans, "N/A" for others)
+# %duration% - Total duration of punishment ("Permanent" for permanent punishments)
+# %remaining% - Time remaining on punishment ("Expired/Permanent" if not applicable)
+# %deactivation_reason% - Why punishment was deactivated (Expired/Removed by [source]/Inactive)
+# %deactivation_source% - Who removed the punishment (if applicable)
+# %deactivation_date% - When punishment was deactivated (formatted)
