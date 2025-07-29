@@ -51,7 +51,6 @@ PunishmentSystem is a high-performance Minecraft punishment plugin designed for 
 - [🛡️ Best Practices](#️-best-practices)
 - [📊 Performance Metrics](#-performance-metrics)
 - [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
 
 ---
 
