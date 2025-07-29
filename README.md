@@ -928,5 +928,5 @@ SOFTWARE.
 
 ## 💬 Support & Community
 
-[![GitHub Issues](https://img.shields.io/github/issues/m7med/PunishmentSystem)](https://github.com/M7MEDpro/PunishmentSystem/issues)
-[![GitHub Stars](https://img.shields.io/github/stars/m7med/PunishmentSystem)](https://github.com/M7MEDpro/PunishmentSystem/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/M7MEDpro/PunishmentSystem)](https://github.com/M7MEDpro/PunishmentSystem/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/M7MEDpro/PunishmentSystem)](https://github.com/M7MEDpro/PunishmentSystem/stargazers)
