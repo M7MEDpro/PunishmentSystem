@@ -14,7 +14,7 @@
 **A Modern Minecraft Punishment Management System**  
 *Optimized performance, minimal memory footprint, and powerful features*
 
-[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [💡 Features](#-features) • [⚡ Performance](#-performance) • [🔧 API](#-api--development)
+e[🚀 Quick Start](#-quick-start) • [💡 Features](#-features) • [⚡ Performance](#-performance) • [🔧 API](#-api--development)
 
 </div>
 
@@ -928,5 +928,5 @@ SOFTWARE.
 
 ## 💬 Support & Community
 
-[![GitHub Issues](https://img.shields.io/github/issues/m7med/PunishmentSystem)](https://github.com/m7med/PunishmentSystem/issues)
-[![GitHub Stars](https://img.shields.io/github/stars/m7med/PunishmentSystem)](https://github.com/m7med/PunishmentSystem/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/m7med/PunishmentSystem)](https://github.com/M7MEDpro/PunishmentSystem/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/m7med/PunishmentSystem)](https://github.com/M7MEDpro/PunishmentSystem/stargazers)
