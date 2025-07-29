@@ -6,6 +6,7 @@ import dev.m7med.punishmentsystem.database.MongoManager;
 import dev.m7med.punishmentsystem.database.MySQLManager;
 import dev.m7med.punishmentsystem.database.SQLiteManager;
 import dev.m7med.punishmentsystem.listener.ChatListener;
+import dev.m7med.punishmentsystem.listener.GuiListener;
 import dev.m7med.punishmentsystem.listener.JoinListener;
 import dev.m7med.punishmentsystem.mangers.ConfigManager;
 import dev.m7med.punishmentsystem.mangers.HistoryMenuManager;
@@ -84,6 +85,7 @@ public final class PunishmentSystem extends JavaPlugin {
         // Register event listeners
         getServer().getPluginManager().registerEvents(new JoinListener(), this);
         getServer().getPluginManager().registerEvents(new ChatListener(), this);
+        getServer().getPluginManager().registerEvents(new GuiListener(), this);
         
         // Initialize command framework with dependency injection
         imperat = BukkitImperat.builder(this)
