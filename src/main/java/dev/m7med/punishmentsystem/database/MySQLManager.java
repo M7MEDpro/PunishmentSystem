@@ -1,5 +1,7 @@
 package dev.m7med.punishmentsystem.database;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import dev.m7med.punishmentsystem.mangers.ConfigManager;
 import dev.m7med.punishmentsystem.model.Punishment;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -13,46 +15,47 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
 
 /**
- * MySQL Database Manager Implementation
- * 
+ * MySQL Database Manager Implementation with HikariCP Connection Pooling
+ *
  * This class provides MySQL-specific implementation of the DatabaseManager interface.
- * It handles all database operations for the punishment system using MySQL as the backend.
- * 
+ * It handles all database operations for the punishment system using MySQL as the backend
+ * with HikariCP for high-performance connection pooling.
+ *
  * Key Features:
- * - Uses MySQL relational database for structured data storage
+ * - Uses HikariCP for efficient connection pooling
+ * - MySQL relational database for structured data storage
  * - Implements efficient indexing for fast queries
  * - Supports all punishment types and operations
  * - Handles deactivation tracking with reason and source
  * - Provides automatic expiration checking and cleanup
- * - Uses connection pooling and prepared statements for security
- * 
+ * - Uses prepared statements for security and performance
+ *
  * Database Structure:
  * - Table: "punishments"
  * - Columns include all punishment data plus deactivation tracking fields
  * - Indexes on player_uuid, player_name, active, and ip_address for performance
  * - Uses InnoDB engine for transaction support
- * 
+ *
+ * Connection Pool Configuration:
+ * - Maximum pool size: 10 connections
+ * - Minimum idle connections: 2
+ * - Connection timeout: 30 seconds
+ * - Idle timeout: 10 minutes
+ * - Maximum lifetime: 30 minutes
+ * - Leak detection threshold: 60 seconds
+ *
  * @author M7med
- * @version 1.0
+ * @version 1.1 - Added HikariCP integration
  */
 public class MySQLManager implements DatabaseManager {
 
     // ========================================
     // FIELDS
     // ========================================
-    
-    /** MySQL connection URL with all necessary parameters */
-    private final String url;
-    
-    /** MySQL username for authentication */
-    private final String user;
-    
-    /** MySQL password for authentication */
-    private final String pass;
-    
-    /** Active database connection */
-    private Connection connection;
-    
+
+    /** HikariCP DataSource for connection pooling */
+    private HikariDataSource dataSource;
+
     /** Configuration file for database settings */
     FileConfiguration cfg = ConfigManager.getConfig();
 
@@ -61,17 +64,12 @@ public class MySQLManager implements DatabaseManager {
     // ========================================
 
     /**
-     * Creates a new MySQLManager instance.
-     * Reads MySQL connection settings from the plugin configuration and builds
-     * the connection URL with proper parameters for Minecraft server environments.
+     * Creates a new MySQLManager instance with HikariCP connection pooling.
+     * Reads MySQL connection settings from the plugin configuration and configures
+     * HikariCP with optimized settings for Minecraft server environments.
      */
     public MySQLManager() {
-        String host = cfg.getString("database.mysql.host");
-        int port = cfg.getInt("database.mysql.port");
-        String db = cfg.getString("database.mysql.database");
-        this.user = cfg.getString("database.mysql.username");
-        this.pass = cfg.getString("database.mysql.password");
-        this.url = "jdbc:mysql://" + host + ":" + port + "/" + db + "?useSSL=false&allowPublicKeyRetrieval=true&autoReconnect=true";
+        setupHikariCP();
     }
 
     // ========================================
@@ -79,15 +77,70 @@ public class MySQLManager implements DatabaseManager {
     // ========================================
 
     /**
-     * Establishes connection to MySQL database.
-     * Creates the initial connection using the configured credentials.
-     * Called during plugin startup.
+     * Sets up HikariCP connection pool with optimized configuration.
+     * Configures the connection pool with settings suitable for a Minecraft plugin.
+     */
+    private void setupHikariCP() {
+        String host = cfg.getString("database.mysql.host");
+        int port = cfg.getInt("database.mysql.port");
+        String database = cfg.getString("database.mysql.database");
+        String username = cfg.getString("database.mysql.username");
+        String password = cfg.getString("database.mysql.password");
+
+        HikariConfig config = new HikariConfig();
+
+        // Basic connection settings
+        config.setJdbcUrl("jdbc:mysql://" + host + ":" + port + "/" + database);
+        config.setUsername(username);
+        config.setPassword(password);
+        config.setDriverClassName("com.mysql.cj.jdbc.Driver");
+
+        // Connection pool settings optimized for Minecraft servers
+        config.setMaximumPoolSize(10);           // Maximum number of connections in pool
+        config.setMinimumIdle(2);                // Minimum number of idle connections
+        config.setConnectionTimeout(30000);      // 30 seconds connection timeout
+        config.setIdleTimeout(600000);           // 10 minutes idle timeout
+        config.setMaxLifetime(1800000);          // 30 minutes maximum connection lifetime
+        config.setLeakDetectionThreshold(60000); // 60 seconds leak detection
+
+        // Connection pool name for monitoring
+        config.setPoolName("PunishmentSystem-MySQL-Pool");
+
+        // MySQL-specific optimizations
+        config.addDataSourceProperty("cachePrepStmts", "true");
+        config.addDataSourceProperty("prepStmtCacheSize", "250");
+        config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+        config.addDataSourceProperty("useServerPrepStmts", "true");
+        config.addDataSourceProperty("useLocalSessionState", "true");
+        config.addDataSourceProperty("rewriteBatchedStatements", "true");
+        config.addDataSourceProperty("cacheResultSetMetadata", "true");
+        config.addDataSourceProperty("cacheServerConfiguration", "true");
+        config.addDataSourceProperty("elideSetAutoCommits", "true");
+        config.addDataSourceProperty("maintainTimeStats", "false");
+
+        // SSL and security settings
+        config.addDataSourceProperty("useSSL", "false");
+        config.addDataSourceProperty("allowPublicKeyRetrieval", "true");
+        config.addDataSourceProperty("autoReconnect", "true");
+
+        // Initialize the data source
+        this.dataSource = new HikariDataSource(config);
+    }
+
+    /**
+     * Establishes connection pool to MySQL database.
+     * The connection pool is already initialized in the constructor,
+     * so this method just ensures the pool is ready.
      */
     @Override
     public void connect() {
-        try {
-            connection = DriverManager.getConnection(url, user, pass);
-        } catch( SQLException e) {
+        // Connection pool is already initialized in constructor
+        // Test the connection to ensure it's working
+        try (Connection connection = getConnection()) {
+            if (!connection.isValid(5)) {
+                throw new SQLException("Connection validation failed");
+            }
+        } catch (SQLException e) {
             e.printStackTrace();
         }
     }
@@ -96,7 +149,7 @@ public class MySQLManager implements DatabaseManager {
      * Creates and sets up the MySQL database schema.
      * Creates the punishments table with all necessary columns and indexes
      * for optimal performance. Uses InnoDB engine for transaction support.
-     * 
+     *
      * Table Structure:
      * - id: Auto-incrementing primary key
      * - player_uuid: Player's UUID (VARCHAR(36))
@@ -114,7 +167,8 @@ public class MySQLManager implements DatabaseManager {
      */
     @Override
     public void setupTables() {
-        try (Statement s = getConnection().createStatement()) {
+        try (Connection connection = getConnection();
+             Statement s = connection.createStatement()) {
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS punishments (
                   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -142,32 +196,25 @@ public class MySQLManager implements DatabaseManager {
     }
 
     /**
-     * Closes the MySQL connection and cleans up resources.
+     * Closes the HikariCP connection pool and cleans up resources.
      * Called during plugin shutdown to prevent resource leaks.
      */
     @Override
     public void disconnect() {
-        try {
-            if (connection != null && !connection.isClosed()) {
-                connection.close();
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        if (dataSource != null && !dataSource.isClosed()) {
+            dataSource.close();
         }
     }
 
     /**
-     * Gets a valid database connection, creating a new one if necessary.
-     * Handles connection pooling and reconnection automatically.
-     * 
-     * @return A valid database connection
-     * @throws SQLException if connection cannot be established
+     * Gets a connection from the HikariCP connection pool.
+     * HikariCP handles connection pooling, validation, and reconnection automatically.
+     *
+     * @return A database connection from the pool
+     * @throws SQLException if connection cannot be obtained from the pool
      */
     private Connection getConnection() throws SQLException {
-        if (connection == null || connection.isClosed()) {
-            connection = DriverManager.getConnection(url, user, pass);
-        }
-        return connection;
+        return dataSource.getConnection();
     }
 
     // ========================================
@@ -178,15 +225,16 @@ public class MySQLManager implements DatabaseManager {
      * Retrieves the most recent active IP ban for a specific IP address.
      * Used to check if an IP address is banned, regardless of which player
      * originally received the IP ban.
-     * 
+     *
      * @param ipAddress The IP address to check
      * @return CompletableFuture containing the most recent active IP ban, or null if none found
      */
     @Override
     public CompletableFuture<Punishment> getActiveIPBanByAddress(String ipAddress) {
         return CompletableFuture.supplyAsync(() -> {
-            try (PreparedStatement ps = getConnection().prepareStatement(
-                    "SELECT * FROM punishments WHERE ip_address = ? AND type = 'IP_BAN' AND active = 1 ORDER BY issuedAt DESC LIMIT 1")) {
+            try (Connection connection = getConnection();
+                 PreparedStatement ps = connection.prepareStatement(
+                         "SELECT * FROM punishments WHERE ip_address = ? AND type = 'IP_BAN' AND active = 1 ORDER BY issuedAt DESC LIMIT 1")) {
                 ps.setString(1, ipAddress);
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
@@ -208,7 +256,7 @@ public class MySQLManager implements DatabaseManager {
     /**
      * Retrieves all active IP bans for a specific IP address.
      * Returns all active IP bans for the address, not just the most recent one.
-     * 
+     *
      * @param ipAddress The IP address to check
      * @return CompletableFuture containing list of all active IP bans for the address
      */
@@ -216,8 +264,9 @@ public class MySQLManager implements DatabaseManager {
     public CompletableFuture<List<Punishment>> getActiveIPBansByAddress(String ipAddress) {
         return CompletableFuture.supplyAsync(() -> {
             List<Punishment> results = new ArrayList<>();
-            try (PreparedStatement ps = getConnection().prepareStatement(
-                    "SELECT * FROM punishments WHERE ip_address = ? AND type = 'IP_BAN' AND active = 1 ORDER BY issuedAt DESC")) {
+            try (Connection connection = getConnection();
+                 PreparedStatement ps = connection.prepareStatement(
+                         "SELECT * FROM punishments WHERE ip_address = ? AND type = 'IP_BAN' AND active = 1 ORDER BY issuedAt DESC")) {
                 ps.setString(1, ipAddress);
                 ResultSet rs = ps.executeQuery();
                 while (rs.next()) {
@@ -241,17 +290,18 @@ public class MySQLManager implements DatabaseManager {
     // ========================================
 
     /**
-     * Saves a punishment to MySQL database.
+     * Saves a punishment to MySQL database using connection pool.
      * Uses prepared statements to prevent SQL injection and ensure data integrity.
-     * 
+     *
      * @param p The punishment object to save
      * @return CompletableFuture that completes when the punishment is saved
      */
     @Override
     public CompletableFuture<Void> savePunishment(Punishment p) {
         return CompletableFuture.runAsync(() -> {
-            try (PreparedStatement ps = getConnection().prepareStatement(
-                    "INSERT INTO punishments(player_uuid,player_name,type,reason,actor,issuedAt,expiresAt,active,ip_address,deactivation_reason,deactivation_source,deactivated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")) {
+            try (Connection connection = getConnection();
+                 PreparedStatement ps = connection.prepareStatement(
+                         "INSERT INTO punishments(player_uuid,player_name,type,reason,actor,issuedAt,expiresAt,active,ip_address,deactivation_reason,deactivation_source,deactivated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")) {
                 ps.setString(1, p.getPlayerUUID().toString());
                 ps.setString(2, p.getPlayerName());
                 ps.setString(3, p.getType().name());
@@ -274,9 +324,9 @@ public class MySQLManager implements DatabaseManager {
     }
 
     /**
-     * Saves a punishment with a specific IP address to MySQL database.
+     * Saves a punishment with a specific IP address to MySQL database using connection pool.
      * Used primarily for IP bans where the IP address needs to be stored separately.
-     * 
+     *
      * @param p The punishment object to save
      * @param ipAddress The IP address to associate with the punishment
      * @return CompletableFuture that completes when the punishment is saved
@@ -284,8 +334,9 @@ public class MySQLManager implements DatabaseManager {
     @Override
     public CompletableFuture<Void> savePunishmentWithIP(Punishment p, String ipAddress) {
         return CompletableFuture.runAsync(() -> {
-            try (PreparedStatement ps = getConnection().prepareStatement(
-                    "INSERT INTO punishments(player_uuid,player_name,type,reason,actor,issuedAt,expiresAt,active,ip_address,deactivation_reason,deactivation_source,deactivated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")) {
+            try (Connection connection = getConnection();
+                 PreparedStatement ps = connection.prepareStatement(
+                         "INSERT INTO punishments(player_uuid,player_name,type,reason,actor,issuedAt,expiresAt,active,ip_address,deactivation_reason,deactivation_source,deactivated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")) {
                 ps.setString(1, p.getPlayerUUID().toString());
                 ps.setString(2, p.getPlayerName());
                 ps.setString(3, p.getType().name());
@@ -314,7 +365,7 @@ public class MySQLManager implements DatabaseManager {
     /**
      * Retrieves all punishments for a player by their UUID.
      * Returns punishments sorted by issue date (newest first).
-     * 
+     *
      * @param playerUUID The UUID of the player
      * @return CompletableFuture containing list of all punishments for the player
      */
@@ -322,8 +373,9 @@ public class MySQLManager implements DatabaseManager {
     public CompletableFuture<List<Punishment>> getPunishmentsByUUID(UUID playerUUID) {
         return CompletableFuture.supplyAsync(() -> {
             List<Punishment> list = new ArrayList<>();
-            try (PreparedStatement ps = getConnection().prepareStatement(
-                    "SELECT * FROM punishments WHERE player_uuid = ? ORDER BY issuedAt DESC")) {
+            try (Connection connection = getConnection();
+                 PreparedStatement ps = connection.prepareStatement(
+                         "SELECT * FROM punishments WHERE player_uuid = ? ORDER BY issuedAt DESC")) {
                 ps.setString(1, playerUUID.toString());
                 ResultSet rs = ps.executeQuery();
                 while (rs.next()) {
@@ -339,7 +391,7 @@ public class MySQLManager implements DatabaseManager {
     /**
      * Retrieves all punishments for a player by their name.
      * Returns punishments sorted by issue date (newest first).
-     * 
+     *
      * @param playerName The name of the player
      * @return CompletableFuture containing list of all punishments for the player
      */
@@ -347,8 +399,9 @@ public class MySQLManager implements DatabaseManager {
     public CompletableFuture<List<Punishment>> getPunishmentsByName(String playerName) {
         return CompletableFuture.supplyAsync(() -> {
             List<Punishment> list = new ArrayList<>();
-            try (PreparedStatement ps = getConnection().prepareStatement(
-                    "SELECT * FROM punishments WHERE player_name = ? ORDER BY issuedAt DESC")) {
+            try (Connection connection = getConnection();
+                 PreparedStatement ps = connection.prepareStatement(
+                         "SELECT * FROM punishments WHERE player_name = ? ORDER BY issuedAt DESC")) {
                 ps.setString(1, playerName);
                 ResultSet rs = ps.executeQuery();
                 while (rs.next()) {
@@ -366,7 +419,7 @@ public class MySQLManager implements DatabaseManager {
      * Only returns punishments that are marked as active and have not expired.
      * If an active punishment is found but has expired, it will be automatically
      * marked as expired in the database.
-     * 
+     *
      * @param playerUUID The UUID of the player
      * @param type The type of punishment to look for
      * @return CompletableFuture containing the active punishment, or null if none found
@@ -374,8 +427,9 @@ public class MySQLManager implements DatabaseManager {
     @Override
     public CompletableFuture<Punishment> getActiveByUUID(UUID playerUUID, Punishment.Type type) {
         return CompletableFuture.supplyAsync(() -> {
-            try (PreparedStatement ps = getConnection().prepareStatement(
-                    "SELECT * FROM punishments WHERE player_uuid = ? AND type = ? AND active = 1 ORDER BY issuedAt DESC LIMIT 1")) {
+            try (Connection connection = getConnection();
+                 PreparedStatement ps = connection.prepareStatement(
+                         "SELECT * FROM punishments WHERE player_uuid = ? AND type = ? AND active = 1 ORDER BY issuedAt DESC LIMIT 1")) {
                 ps.setString(1, playerUUID.toString());
                 ps.setString(2, type.name());
                 ResultSet rs = ps.executeQuery();
@@ -401,7 +455,7 @@ public class MySQLManager implements DatabaseManager {
      * Only returns punishments that are marked as active and have not expired.
      * If an active punishment is found but has expired, it will be automatically
      * marked as expired in the database.
-     * 
+     *
      * @param playerName The name of the player
      * @param type The type of punishment to look for
      * @return CompletableFuture containing the active punishment, or null if none found
@@ -409,8 +463,9 @@ public class MySQLManager implements DatabaseManager {
     @Override
     public CompletableFuture<Punishment> getActiveByName(String playerName, Punishment.Type type) {
         return CompletableFuture.supplyAsync(() -> {
-            try (PreparedStatement ps = getConnection().prepareStatement(
-                    "SELECT * FROM punishments WHERE player_name = ? AND type = ? AND active = 1 ORDER BY issuedAt DESC LIMIT 1")) {
+            try (Connection connection = getConnection();
+                 PreparedStatement ps = connection.prepareStatement(
+                         "SELECT * FROM punishments WHERE player_name = ? AND type = ? AND active = 1 ORDER BY issuedAt DESC LIMIT 1")) {
                 ps.setString(1, playerName);
                 ps.setString(2, type.name());
                 ResultSet rs = ps.executeQuery();
@@ -436,18 +491,19 @@ public class MySQLManager implements DatabaseManager {
     // ========================================
 
     /**
-     * Marks a punishment as expired in the database.
+     * Marks a punishment as expired in the database using connection pool.
      * Updates the record to set active=0, deactivation_reason='EXPIRED',
      * and sets the deactivated_at timestamp.
-     * 
+     *
      * @param id The unique identifier of the punishment to remove
      * @return CompletableFuture that completes when the punishment is marked as expired
      */
     @Override
     public CompletableFuture<Void> removePunishment(int id) {
         return CompletableFuture.runAsync(() -> {
-            try (PreparedStatement ps = getConnection().prepareStatement(
-                    "UPDATE punishments SET active = 0, deactivation_reason = 'EXPIRED', deactivated_at = ? WHERE id = ?")) {
+            try (Connection connection = getConnection();
+                 PreparedStatement ps = connection.prepareStatement(
+                         "UPDATE punishments SET active = 0, deactivation_reason = 'EXPIRED', deactivated_at = ? WHERE id = ?")) {
                 ps.setLong(1, System.currentTimeMillis());
                 ps.setInt(2, id);
                 ps.executeUpdate();
@@ -458,10 +514,10 @@ public class MySQLManager implements DatabaseManager {
     }
 
     /**
-     * Marks a punishment as removed by a specific source in the database.
+     * Marks a punishment as removed by a specific source in the database using connection pool.
      * Updates the record to set active=0, deactivation_reason='REMOVED_BY_SOURCE',
      * sets the deactivation_source, and sets the deactivated_at timestamp.
-     * 
+     *
      * @param id The unique identifier of the punishment to remove
      * @param source The name of who removed the punishment
      * @return CompletableFuture that completes when the punishment is marked as removed
@@ -469,8 +525,9 @@ public class MySQLManager implements DatabaseManager {
     @Override
     public CompletableFuture<Void> removePunishment(int id, String source) {
         return CompletableFuture.runAsync(() -> {
-            try (PreparedStatement ps = getConnection().prepareStatement(
-                    "UPDATE punishments SET active = 0, deactivation_reason = 'REMOVED_BY_SOURCE', deactivation_source = ?, deactivated_at = ? WHERE id = ?")) {
+            try (Connection connection = getConnection();
+                 PreparedStatement ps = connection.prepareStatement(
+                         "UPDATE punishments SET active = 0, deactivation_reason = 'REMOVED_BY_SOURCE', deactivation_source = ?, deactivated_at = ? WHERE id = ?")) {
                 ps.setString(1, source);
                 ps.setLong(2, System.currentTimeMillis());
                 ps.setInt(3, id);
@@ -489,7 +546,7 @@ public class MySQLManager implements DatabaseManager {
      * Converts a MySQL ResultSet to a Punishment object.
      * Handles all field mapping including the new deactivation fields.
      * Properly handles null values and type conversions.
-     * 
+     *
      * @param rs The MySQL ResultSet to convert
      * @return The converted Punishment object
      * @throws SQLException if there's an error reading from the ResultSet
@@ -499,20 +556,20 @@ public class MySQLManager implements DatabaseManager {
                 ? null
                 : Instant.ofEpochMilli(rs.getLong("expiresAt"));
         String ipAddress = rs.getString("ip_address");
-        
+
         // Handle new deactivation fields
         String deactivationReasonStr = rs.getString("deactivation_reason");
-        Punishment.DeactivationReason deactivationReason = deactivationReasonStr != null ? 
-            Punishment.DeactivationReason.valueOf(deactivationReasonStr) : Punishment.DeactivationReason.ACTIVE;
-        
+        Punishment.DeactivationReason deactivationReason = deactivationReasonStr != null ?
+                Punishment.DeactivationReason.valueOf(deactivationReasonStr) : Punishment.DeactivationReason.ACTIVE;
+
         String deactivationSource = rs.getString("deactivation_source");
-        
+
         Instant deactivatedAt = null;
         long deactivatedAtMillis = rs.getLong("deactivated_at");
         if (deactivatedAtMillis > 0) {
             deactivatedAt = Instant.ofEpochMilli(deactivatedAtMillis);
         }
-        
+
         return new Punishment(
                 rs.getInt("id"),
                 UUID.fromString(rs.getString("player_uuid")),
@@ -528,5 +585,24 @@ public class MySQLManager implements DatabaseManager {
                 deactivationSource,
                 deactivatedAt
         );
+    }
+
+    /**
+     * Gets information about the current connection pool status.
+     * Useful for monitoring and debugging connection pool health.
+     *
+     * @return String containing connection pool statistics
+     */
+    public String getPoolStats() {
+        if (dataSource != null) {
+            return String.format(
+                    "Pool Stats - Active: %d, Idle: %d, Total: %d, Threads Waiting: %d",
+                    dataSource.getHikariPoolMXBean().getActiveConnections(),
+                    dataSource.getHikariPoolMXBean().getIdleConnections(),
+                    dataSource.getHikariPoolMXBean().getTotalConnections(),
+                    dataSource.getHikariPoolMXBean().getThreadsAwaitingConnection()
+            );
+        }
+        return "Connection pool not initialized";
     }
 }
